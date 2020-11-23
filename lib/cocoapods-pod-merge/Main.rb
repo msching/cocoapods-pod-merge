@@ -257,6 +257,7 @@ module CocoapodsPodMerge
 
           Dir.glob('**/*.{h,m,mm,swift}').each do |source_file|
             contents = File.read(source_file)
+            is_header = File.extname(source_file) == '.h';
             if has_dependencies
               # Fix imports of style import xx
               pods_to_merge.each do |pod|
@@ -264,10 +265,13 @@ module CocoapodsPodMerge
                 next unless modular_imports&.last
 
                 Pod::UI.puts "\t\tExperimental: ".yellow + "Found Modular Imports in #{source_file}, fixing this by converting to local #import".magenta
-                contents_with_imports_fixed = contents.gsub(%r{<#{pod}/(.+)>}) do |match|
-                  match.gsub(%r{<#{pod}/(.+)>}, "\"#{Regexp.last_match(1)}\"")
+                contents = contents.gsub(%r{<#{pod}/(.+)>}) do |match|
+                  if is_header
+                    match.gsub(%r{<#{pod}/(.+)>}, "<#{merged_framework_name}/#{Regexp.last_match(1)}>")
+                  else
+                    match.gsub(%r{<#{pod}/(.+)>}, "\"#{Regexp.last_match(1)}\"")
+                  end
                 end
-                File.open(source_file, 'w') { |file| file.puts contents_with_imports_fixed }
               end
 
               # Fix imports of style import xx
@@ -276,17 +280,22 @@ module CocoapodsPodMerge
                 next unless modular_imports&.last
 
                 Pod::UI.puts "\t\tExperimental: ".yellow + "Found a module import in #{source_file}, fixing this by removing it".magenta
-                File.open(source_file, 'w') { |file| file.puts contents.gsub("import #{pod}", '') }
+                contents = contents.gsub("import #{pod}", '')
               end
+              File.open(source_file, 'w') { |file| file.puts contents }
             else
               modular_imports = contents.scan(%r{<#{pod}/(.+)>})
               next unless modular_imports&.last
 
               Pod::UI.puts "\t\tExperimental: ".yellow + "Found Modular Imports in #{source_file}, fixing this by converting to local #import".magenta
-              contents_with_imports_fixed = contents.gsub(%r{<#{pod}/(.+)>}) do |match|
-                match.gsub(%r{<#{pod}/(.+)>}, "\"#{Regexp.last_match(1)}\"")
+              contents = contents.gsub(%r{<#{pod}/(.+)>}) do |match|
+                if is_header
+                  match.gsub(%r{<#{pod}/(.+)>}, "<#{merged_framework_name}/#{Regexp.last_match(1)}>")
+                else
+                  match.gsub(%r{<#{pod}/(.+)>}, "\"#{Regexp.last_match(1)}\"")
+                end
               end
-              File.open(source_file, 'w') { |file| file.puts contents_with_imports_fixed }
+              File.open(source_file, 'w') { |file| file.puts contents }
             end
           end
         end
